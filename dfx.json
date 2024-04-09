@@ -1,0 +1,29 @@
+{
+  "canisters": {
+    "Tune_AI_backend": {
+      "main": "src/Tune_AI_backend/main.mo",
+      "type": "motoko"
+    },
+    "Tune_AI_frontend": {
+      "dependencies": [
+        "Tune_AI_backend"
+      ],
+      "frontend": {
+        "entrypoint": "src/Tune_AI_frontend/src/index.html"
+      },
+      "source": [
+        "src/Tune_AI_frontend/assets",
+        "dist/Tune_AI_frontend/"
+      ],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
