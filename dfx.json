@@ -1,27 +1,39 @@
 {
   "canisters": {
-    "Tune_AI_backend": {
-      "main": "src/Tune_AI_backend/main.mo",
+    "manager": {
+      "main": "src/Tune_AI_backend/manager/manager.mo",
+      "type": "motoko",
+      "optimize": "cycles"
+    },
+    "account": {
+      "main": "src/Tune_AI_backend/artist/account.mo",
       "type": "motoko"
     },
-    "Tune_AI_frontend": {
-      "dependencies": [
-        "Tune_AI_backend"
-      ],
-      "frontend": {
-        "entrypoint": "src/Tune_AI_frontend/src/index.html"
+    "content": {
+      "main": "src/Tune_AI_backend/artist/content.mo",
+      "type": "motoko"
+    },
+    "identity": {
+      "main": "src/Tune_AI_backend/identity/identity.mo",
+      "type": "motoko"
+    },
+    "internet_identity": {
+      "type": "custom",
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
       },
-      "source": [
-        "src/Tune_AI_frontend/assets",
-        "dist/Tune_AI_frontend/"
-      ],
-      "type": "assets"
+      "frontend": {}
     }
   },
+
   "defaults": {
     "build": {
       "args": "",
-      "packtool": ""
+      "packtool": "vessel sources"
     }
   },
   "output_env_file": ".env",
