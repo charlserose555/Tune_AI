@@ -95,10 +95,15 @@ module Types {
     public type ArtistAccountData = {
         createdAt: Timestamp;
         userPrincipal: Principal;
-        // profilePhoto: ?ProfilePhoto;
-        // coverPhoto: ?CoverPhoto;
+        profilePhoto: ?ProfilePhoto;
+        displayName: ?Text;
+        userName: ?Text;
     };
 
+    public type PrincipalInfo = {
+        userPrincipal: Principal;
+        createdAt: Timestamp;
+    };
 
     public type StatusRequest = {
         cycles: Bool;

@@ -1,7 +1,7 @@
 module {
   public let admin : [Text] = [
-    "cd5mb-c6i5a-hqux6-3b534-lblje-pprtu-kxoip-jcebd-l2leu-txmid-uae",
-    "ro74n-tslcs-bqprk-au7j6-ustpa-jpkhq-oee4a-7nzxs-vcdwf-k23tv-vqe"
+    "uucm4-e6fs2-4flyc-qwm22-q2s4q-cm2os-ptdyx-qc2rj-r2cuy-e7qd6-mae",
+    "uucm4-e6fs2-4flyc-qwm22-q2s4q-cm2os-ptdyx-qc2rj-r2cuy-e7qd6-mae"
   ];
-  public let manager : [Text] = ["q67h6-4o4qh-e77b5-jc4qo-cmoeo-hqs6o-g4dij-yg6q6-rtu7g-3o7fb-tqe"];
+  public let manager : [Text] = ["uucm4-e6fs2-4flyc-qwm22-q2s4q-cm2os-ptdyx-qc2rj-r2cuy-e7qd6-mae"];
 };

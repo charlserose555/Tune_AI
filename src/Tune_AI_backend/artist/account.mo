@@ -28,7 +28,7 @@ import WalletUtils          "../utils/wallet.utils";
 import IC                   "../ic.types";
 import Env                  "../env";
 
- shared({caller = managerCanister}) actor class ArtistBucket(accountInfo: ?T.ArtistAccountData, artistPrincipal: Principal, cyclesManager: Principal) = this {
+ shared({caller = managerCanister}) actor class ArtistBucket(accountInfo: ?T.PrincipalInfo, artistPrincipal: Principal, cyclesManager: Principal) = this {
 
   let { ihash; nhash; thash; phash; calcHash } = Map;
 
@@ -56,7 +56,6 @@ import Env                  "../env";
   stable var owner: Principal     = artistPrincipal;
   // Stable variable holding the cycles requester
 
-
   private let walletUtils : WalletUtils.WalletUtils = WalletUtils.WalletUtils();
   private let canisterUtils : CanisterUtils.CanisterUtils = CanisterUtils.CanisterUtils();
 
@@ -67,7 +66,7 @@ import Env                  "../env";
 
 
 // #region - CREATE CONTENT CANISTERS
-  public func initCanister() : async (Bool) { // Initialise new cansiter. This is called only once after the account has been created. I
+  public func createProfileInfo(accountInfo: ?T.ArtistAccountData) : async (Bool) { // Initialise new cansiter. This is called only once after the account has been created. I
     assert(initialised == false);
     switch(accountInfo){
       case(?info){
@@ -77,8 +76,6 @@ import Env                  "../env";
       };case null return false;
     };
   };
-
-
 
   public shared({caller}) func createContent(i : ContentInit) : async ?(ContentId, Principal) {
     Debug.print("@createContent: caller of this function is:\n" # Principal.toText(caller));
@@ -141,8 +138,6 @@ import Env                  "../env";
     }
   };
 
-
-
   private func createStorageCanister(owner: UserId) : async ?(Principal) {
 
     // await checkCyclesBalance();
@@ -200,14 +195,10 @@ import Env                  "../env";
     return canisterId;
   };
 
-
-
   public query({caller}) func getProfileInfo(user: UserId) : async (?ArtistAccountData){
-    assert(caller == owner or Utils.isManager(caller));
+    // assert(caller == owner or Utils.isManager(caller));
     Map.get(artistData, phash, user);
   };
-
-
 
   public shared({caller}) func updateProfileInfo( info: ArtistAccountData) : async (Bool){
     assert(caller == owner or Utils.isManager(caller));
@@ -218,8 +209,6 @@ import Env                  "../env";
       };case null false;
     };
   };
-
-
 
   public shared({caller}) func removeContent(contentId: ContentId, chunkNum : Nat) : async () {
     assert(caller == owner or Utils.isManager(caller));
@@ -234,8 +223,6 @@ import Env                  "../env";
       case null { };
     };
   };
-
-
 
   public query({caller}) func getCanisterOfContent(contentId: ContentId) : async (?CanisterId){
 
@@ -253,9 +240,6 @@ import Env                  "../env";
     
   };
 
-
-
-
   public query({caller}) func getEntriesOfCanisterToContent() : async [(CanisterId, ContentId)]{
     assert(caller == owner or Utils.isManager(caller));
     var res = Buffer.Buffer<(CanisterId, ContentId)>(2);
@@ -266,9 +250,6 @@ import Env                  "../env";
     };       
     return Buffer.toArray(res);
   };
-
-
-
 
   public query({caller}) func getAllContentCanisters() : async [CanisterId]{
     // assert(caller == owner or Utils.isManager(caller) or caller == managerCanister);

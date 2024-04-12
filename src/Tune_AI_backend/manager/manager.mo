@@ -30,8 +30,8 @@ import B                  "mo:stable-buffer/StableBuffer";
 
 actor Manager {
 
-  type FanAccountData                 = T.FanAccountData;
   type ArtistAccountData              = T.ArtistAccountData;
+  type PrincipalInfo                  = T.PrincipalInfo;
   type UserType                       = T.UserType;
   type UserId                         = T.UserId;
   type CanisterId                     = T.CanisterId;
@@ -44,7 +44,7 @@ actor Manager {
 
   private let ic : IC.Self = actor "aaaaa-aa";
 
-  private let cyclesManagerId : Principal = Principal.fromText("exmw2-raaaa-aaaan-qecxa-cai");
+  private let cyclesManagerId : Principal = Principal.fromText("bnz7o-iuaaa-aaaaa-qaaaa-cai");
 
   let { ihash; nhash; thash; phash; calcHash } = Map;
 
@@ -62,43 +62,34 @@ actor Manager {
   stable let artistAccountsMap    = Map.new<UserId, CanisterId>(phash);
 
 
-
-// #region - CREATE ACCOUNT CANISTERS
-  public shared({caller}) func createProfileFan(accountData: FanAccountData) : async (Principal){
-    if (not Utils.isManager(caller)) {
-      throw Error.reject("@createProfileFan: Unauthorized access. Caller is not the manager. Caller: " # Principal.toText(caller));
-    };
-    await createCanister(accountData.userPrincipal, #fan, ?accountData, null);
-  };
-
-
-
-
-  public shared({caller}) func createProfileArtist(accountData: ArtistAccountData) : async (Principal){
-    if (not Utils.isManager(caller)) {
-      throw Error.reject("@createProfileArtist: Unauthorized access. Caller is not the manager. Caller: " # Principal.toText(caller));
-    };
-    await createCanister(accountData.userPrincipal, #artist, null, ?accountData);
+  public shared({caller}) func createProfileArtist(accountData: PrincipalInfo) : async (?Principal){
+    // if (caller != accountData.userPrincipal) {
+    //   throw Error.reject("@createProfileArtist: Unauthorized access. Caller is not the artist. Caller: " # Principal.toText(caller));
+    // };
+    await createCanister(accountData.userPrincipal, #artist, ?accountData);
   };  
 
 
-
-
-  private func createCanister(userID: Principal, userType: UserType, accountDataFan: ?FanAccountData, accountDataArtist: ?ArtistAccountData): async (Principal) {
+  private func createCanister(userID: Principal, userType: UserType, accountDataArtist: ?PrincipalInfo): async (?Principal) {
     Debug.print("@createCanister: userID: " # Principal.toText(userID));
     
+     let self: Principal = Principal.fromActor(Manager);
+
     Cycles.add(1_000_000_000_000);
 
     var canisterId: ?Principal = null;
 
     switch(Map.get(artistAccountsMap, phash, userID)){
       case(?exists){
-        throw Error.reject("@createCanister: This principal is already associated with an account");
+        return Map.get(artistAccountsMap, phash, userID);
       }; case null {
         let b = await ArtistBucket.ArtistBucket(accountDataArtist, userID, cyclesManagerId);
         canisterId := ?(Principal.fromActor(b));
       };
     };
+
+    let b = await ArtistBucket.ArtistBucket(accountDataArtist, userID, cyclesManagerId);
+    canisterId := ?(Principal.fromActor(b));
 
     let bal = getCurrentCycles();
     Debug.print("@createCanister: Cycles Balance After Canister Creation: " #debug_show bal);
@@ -108,6 +99,7 @@ actor Manager {
     //    throw Error.reject("@createCanister: Manager canister is out of cycles! Please replenish supply.");
     // };
 
+    // return canisterId;
     switch (canisterId) {
       case null {
         throw Error.reject("@createCanister: Bucket init error, your account canister could not be created.");
@@ -125,16 +117,12 @@ actor Manager {
             compute_allocation = null;
           }}));
 
-          await walletUtils.transferCycles(canisterId, 2_000_000_000_000);
+        await walletUtils.transferCycles(canisterId, 1_000_000_000_000);
 
-        if (userType == #fan) {   
-          let a = Map.put(fanAccountsMap, phash, userID, canisterId);
-          numOfFanAccounts := numOfFanAccounts + 1;
-        } else {   
-          let b = Map.put(artistAccountsMap, phash, userID, canisterId);
-          numOfArtistAccounts := numOfArtistAccounts + 1;
-        };
-        return canisterId;
+        let b = Map.put(artistAccountsMap, phash, userID, canisterId);
+        numOfArtistAccounts := numOfArtistAccounts + 1;
+
+        return ?canisterId;
       };
     };
   };
@@ -151,32 +139,9 @@ actor Manager {
 
 
 
-
-
-
-// #region - FETCH STATE
-  public query func getTotalFanAccounts() :  async Nat{    
-    numOfFanAccounts   
-  };  
-
-
-
-
   public query func getTotalArtistAccounts() :  async Nat{   
     numOfArtistAccounts   
   }; 
-
-
-
-
-  public query({caller}) func getFanAccountEntries() : async [(Principal, Principal)]{    
-    if (not Utils.isManager(caller)) {
-      throw Error.reject("@getFanAccountEntries: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
-    };
-    Iter.toArray(Map.entries(fanAccountsMap));    
-  };
-
-
 
 
   public query({caller}) func getArtistAccountEntries() : async [(UserId, CanisterId)]{   
@@ -196,38 +161,10 @@ actor Manager {
 
 
 
-
-  public query({caller}) func getCanisterFan(fan: Principal) : async (?Principal){    
-    assert(caller == fan or Utils.isManager(caller));
-    Map.get(fanAccountsMap, phash, fan);   
-  };
-
-
-
-
   public query({caller}) func getCanisterArtist(artist: Principal) : async (?Principal){   
     // assert(caller == artist or Utils.isManager(caller));
     Map.get(artistAccountsMap, phash, artist);    
   };
-
-
-
-
-  public query({caller}) func getOwnerOfFanCanister(canisterId: Principal) : async (?UserId){ 
-    if (not Utils.isManager(caller)) {
-      throw Error.reject("@getOwnerOfFanCanister: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
-    };
-    for((key, value) in Map.entries(fanAccountsMap)){
-      var fan: ?UserId = ?key;
-      var canID = value;
-      if (canID == canisterId){
-        return fan;
-      };
-    };
-    return null;
-  };
-
-
 
 
   public query({caller}) func getOwnerOfArtistCanister(canisterId: Principal) : async (?UserId){ 
@@ -367,32 +304,12 @@ Debug.print("@getStatus: caller: " # Principal.toText(caller));
     CYCLE_AMOUNT := amount;   
   };
 
-
-
-
   public shared({caller}) func changeCanisterSize(newSize: Nat) : (){    // utils based
     if (not Utils.isManager(caller)) {
       throw Error.reject("@changeCanisterSize: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
     };
     MAX_CANISTER_SIZE := newSize;
   };
-
-
-
-
-  public shared({caller}) func transferOwnershipFan(currentOwner: Principal, newOwner: Principal) : async (){
-    assert(caller == currentOwner or Utils.isManager(caller));
-    switch(Map.get(fanAccountsMap, phash, currentOwner)){
-      case(?canisterId){
-        Map.delete(fanAccountsMap, phash, currentOwner);
-        let a = Map.put(fanAccountsMap, phash, newOwner, canisterId);
-
-      }; case null throw Error.reject("@transferOwnershipFan: This fan account doesnt exist");
-    };
-  };
-
-
-
 
   public shared({caller}) func transferOwnershipArtist(currentOwner: Principal, newOwner: Principal) : async (){
     assert(caller == currentOwner or Utils.isManager(caller));
@@ -402,10 +319,6 @@ Debug.print("@getStatus: caller: " # Principal.toText(caller));
       }; case null throw Error.reject("@transferOwnershipArtist: This artist account doesnt exist.");
     };
   };
-
-
-
-
 
   public shared({caller}) func transferCyclesToAccountCanister(canisterId : Principal, amount : Nat) : async () { 
     // assert(caller == canisterId or Utils.isManager(caller));
@@ -440,8 +353,6 @@ Debug.print("@getStatus: caller: " # Principal.toText(caller));
       }
     };
   };
-
-
 
 
   public shared({caller}) func deleteAccountCanister(user: UserId, canisterId: Principal, userType: UserType) :  async (Bool){
