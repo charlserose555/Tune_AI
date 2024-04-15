@@ -62,7 +62,7 @@ actor Manager {
   stable let artistAccountsMap    = Map.new<UserId, CanisterId>(phash);
 
 
-  public shared({caller}) func createProfileForArtist(accountData: PrincipalInfo) : async (?Principal){
+  public shared({caller}) func creactAccountCanister(accountData: PrincipalInfo) : async (?Principal){
     // if (caller != accountData.userPrincipal) {
     //   throw Error.reject("@createProfileArtist: Unauthorized access. Caller is not the artist. Caller: " # Principal.toText(caller));
     // };
