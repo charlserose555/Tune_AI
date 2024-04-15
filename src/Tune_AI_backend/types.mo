@@ -93,11 +93,11 @@ module Types {
     };
 
     public type ArtistAccountData = {
-        createdAt: Timestamp;
+        displayName: Text;
+        userName: Text;
         userPrincipal: Principal;
         profilePhoto: ?ProfilePhoto;
-        displayName: ?Text;
-        userName: ?Text;
+        createdAt: Timestamp;
     };
 
     public type PrincipalInfo = {

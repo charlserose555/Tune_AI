@@ -8,6 +8,10 @@
     "account": {
       "main": "src/Tune_AI_backend/artist/account.mo",
       "type": "motoko"
+    },
+    "content": {
+      "main": "src/Tune_AI_backend/artist/content.mo",
+      "type": "motoko"
     }
   },
 
