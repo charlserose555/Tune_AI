@@ -6,11 +6,15 @@
       "optimize": "cycles"
     },
     "account": {
-      "main": "src/Tune_AI_backend/artist/account.mo",
+      "main": "src/Tune_AI_backend/account/account.mo",
+      "type": "motoko"
+    },
+    "contentManager": {
+      "main": "src/Tune_AI_backend/manager/contentManager.mo",
       "type": "motoko"
     },
     "content": {
-      "main": "src/Tune_AI_backend/artist/content.mo",
+      "main": "src/Tune_AI_backend/content/content.mo",
       "type": "motoko"
     }
   },

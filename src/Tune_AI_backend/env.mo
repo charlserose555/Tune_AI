@@ -3,5 +3,7 @@ module {
     "uucm4-e6fs2-4flyc-qwm22-q2s4q-cm2os-ptdyx-qc2rj-r2cuy-e7qd6-mae",
     "uucm4-e6fs2-4flyc-qwm22-q2s4q-cm2os-ptdyx-qc2rj-r2cuy-e7qd6-mae"
   ];
+  public let contentManager : Text = "be2us-64aaa-aaaaa-qaabq-cai";
+
   public let manager : [Text] = ["uucm4-e6fs2-4flyc-qwm22-q2s4q-cm2os-ptdyx-qc2rj-r2cuy-e7qd6-mae"];
 };

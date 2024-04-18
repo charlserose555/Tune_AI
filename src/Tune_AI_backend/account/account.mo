@@ -21,7 +21,7 @@ import TrieMap              "mo:base/TrieMap";
 import CanisterUtils        "../utils/canister.utils";
 import Prim                 "mo:⛔";
 import Map                  "mo:stable-hash-map/Map";
-import ArtistContentBucket  "./content";
+import ArtistContentBucket  "../content/content";
 import B                    "mo:stable-buffer/StableBuffer";
 import Utils                "../utils/utils";
 import WalletUtils          "../utils/wallet.utils";
@@ -66,22 +66,41 @@ import Env                  "../env";
 
 
 // #region - CREATE CONTENT CANISTERS
-  public func createProfileInfo(accountInfo: ?T.ArtistAccountData) : async (Bool) { // Initialise new cansiter. This is called only once after the account has been created. I
-    assert(initialised == false);
+  public func createProfileInfo(accountInfo: ?ArtistAccountData) : async (Bool) { // Initialise new cansiter. This is called only once after the account has been created. I
     switch(accountInfo){
       case(?info){
         let a = Map.put(artistData, phash, artistPrincipal, info);
-        initialised := true;
         return true;
       };case null return false;
     };
   };
 
-  public shared({caller}) func createContent(i : ContentInit) : async ?(ContentId, Principal) {
+  public shared({caller}) func editProfileInfo( info: ArtistAccountData) : async (Bool){
+    assert(caller == owner or Utils.isManager(caller));
+    var exist = Map.get(artistData, phash, caller);
+
+    if (exist != null){
+        var update = Map.replace(artistData, phash, caller, info);
+        return true;
+    } else {
+      var update = Map.add(artistData, phash, caller, info);  
+      return true;
+    }; 
+  };
+
+  public shared({caller}) func createContent(i : ContentInit) : async ?(contentId : ContentId, contentCanisterId : Principal) {
     Debug.print("@createContent: caller of this function is:\n" # Principal.toText(caller));
     assert(caller == owner or Utils.isManager(caller));
 
     var uploaded : Bool = false;
+
+    let contentManager = actor(Env.contentManager): actor { 
+      getAvailableContentId: () -> async (Nat);
+      registerContentInfo: (ContentData) -> async (?ContentId);
+    };
+
+    let contentUUID : Nat = await contentManager.getAvailableContentId();
+
     for(canister in B.vals(contentCanisterIds)){
       Debug.print("canister: " # debug_show canister);
 
@@ -92,13 +111,23 @@ import Env                  "../env";
           if(availableMemory > i.size){
 
             let can = actor(Principal.toText(canister)): actor { 
-              createContent: (ContentInit) -> async (?ContentId);
+              createContent: (ContentInit, Nat) -> async ?(ContentId, ContentData);
             };
 
-            switch(await can.createContent(i)){
-              case(?contentId){ 
-                let a = Map.put(contentToCanister, thash, contentId, canister);
+            Debug.print("contentUUID: " # debug_show contentUUID);
+            
+            switch(await can.createContent(i, contentUUID)){
+              case(?(contentId, contentInfo)){ 
+
+                let a = Map.put(contentToCanister, thash, Nat.toText(contentUUID), canister);
                 uploaded := true;
+
+                Debug.print("uploaded: " # debug_show uploaded);
+
+                let c = await contentManager.registerContentInfo(contentInfo);
+                
+                Debug.print("contentInfo: " # debug_show contentInfo);
+
                 return ?(contentId, canister);
               };
               case null { 
@@ -116,13 +145,15 @@ import Env                  "../env";
         case(?canID){
           B.add(contentCanisterIds, canID);
           let newCan = actor(Principal.toText(canID)): actor { 
-            createContent: (ContentInit) -> async (?ContentId);
+              createContent: (ContentInit, Nat) -> async ?(ContentId, ContentData);
           };
-          switch(await newCan.createContent(i)){
-            case(?contentId){ 
+          switch(await newCan.createContent(i, contentUUID)){
+            case(?(contentId, contentInfo)){ 
               Debug.print("putting in the mapping contentId: " # debug_show contentId);
               let a = Map.put(contentToCanister, thash, contentId, canID);
                 Debug.print("res: " # debug_show a);
+
+              let c = await contentManager.registerContentInfo(contentInfo);
               uploaded := true;
               return ?(contentId, canID)  
             };
@@ -139,8 +170,7 @@ import Env                  "../env";
   };
 
   private func createStorageCanister(owner: UserId) : async ?(Principal) {
-
-    // await checkCyclesBalance();
+    await checkCyclesBalance();
     Debug.print("@createStorageCanister: owner (artist) principal: " # debug_show Principal.toText(owner));
     Debug.print("@createStorageCanister: Environment Manager Principal: " # Env.manager[0]);
     Prim.cyclesAdd(1_000_000_000_000);
@@ -200,16 +230,6 @@ import Env                  "../env";
     Map.get(artistData, phash, user);
   };
 
-  public shared({caller}) func updateProfileInfo( info: ArtistAccountData) : async (Bool){
-    assert(caller == owner or Utils.isManager(caller));
-    switch(Map.get(artistData, phash, caller)){
-      case(?exists){
-        var update = Map.replace(artistData, phash, caller, info);
-        true
-      };case null false;
-    };
-  };
-
   public shared({caller}) func removeContent(contentId: ContentId, chunkNum : Nat) : async () {
     assert(caller == owner or Utils.isManager(caller));
     switch(Map.get(contentToCanister, thash, contentId)){
@@ -257,16 +277,6 @@ import Env                  "../env";
   };
 // #endregion
 
-
-
-
-
-
-
-
-
-
-
 // #region - UTILS
   private func getAvailableMemoryCanister(canisterId: Principal) : async ?Nat{
     let can = actor(Principal.toText(canisterId)): actor { 
@@ -299,27 +309,24 @@ import Env                  "../env";
   };
 
 
-  // public shared({caller}) func checkCyclesBalance () : async(){
-  //   Debug.print("@checkCyclesBalance: caller of this function is: " # debug_show caller);
-  //   // assert(caller == owner or Utils.isManager(caller) or caller == Principal.fromActor(this));
-  //   Debug.print("@checkCyclesBalance: creator of this smart contract: " # debug_show managerCanister);
-  //   let bal = getCurrentCycles();
-  //   Debug.print("@checkCyclesBalance: Cycles Balance After Canister Creation: " # debug_show bal);
-  //   if(bal < CYCLE_AMOUNT){
-  //      await transferCyclesToThisCanister();
-  //   };
-  // };
+  public shared({caller}) func checkCyclesBalance () : async(){
+    Debug.print("@checkCyclesBalance: caller of this function is: " # debug_show caller);
+    // assert(caller == owner or Utils.isManager(caller) or caller == Principal.fromActor(this));
+    Debug.print("@checkCyclesBalance: creator of this smart contract: " # debug_show managerCanister);
+    let bal = getCurrentCycles();
+    Debug.print("@checkCyclesBalance: Cycles Balance After Canister Creation: " # debug_show bal);
+    if(bal < CYCLE_AMOUNT + top_up_amount){
+       await transferCyclesToThisCanister();
+    };
+  };
 
-
-
-  // public func transferCyclesToThisCanister() : async (){
-  //   let self: Principal = Principal.fromActor(this);
-  //   let can = actor(Principal.toText(managerCanister)): actor { 
-  //     transferCyclesToAccountCanister: (Principal, Nat) -> async ();
-  //   };
-  //   let accepted = await wallet_receive();
-  //   await can.transferCyclesToAccountCanister(self, Nat64.toNat(accepted.accepted));
-  // };
+  public func transferCyclesToThisCanister() : async (){
+    let self: Principal = Principal.fromActor(this);
+    let can = actor(Principal.toText(managerCanister)): actor { 
+      transferCyclesToAccountCanister: (Principal, Nat) -> async ();
+    };
+    await can.transferCyclesToAccountCanister(self, top_up_amount);
+  };
 
   // public func transferCyclesToThisCanister() : async (){
   //   let self: Principal = Principal.fromActor(this);
@@ -406,8 +413,12 @@ import Env                  "../env";
 
 
    private func wallet_receive() : async { accepted: Nat64 } {
+
     let available = Cycles.available();
     let accepted = Cycles.accept(Nat.min(available, top_up_amount));
+    Debug.print("@available" # debug_show available);
+    Debug.print("@accepted" # debug_show accepted);
+
     // let accepted = Cycles.accept(top_up_amount);
     { accepted = Nat64.fromNat(accepted) };
   };
@@ -421,7 +432,7 @@ import Env                  "../env";
   };
 
   public shared({caller}) func deleteAccount(user: Principal): async(){
-    assert(caller == owner or Utils.isManager(caller));
+    // assert(caller == owner or Utils.isManager(caller));
     let canisterId :?Principal = ?(Principal.fromActor(this));
     let res = await canisterUtils.deleteCanister(canisterId);
   };
@@ -439,9 +450,9 @@ import Env                  "../env";
 
 
   public shared({caller}) func deleteContentCanister(user: UserId, canisterId: Principal) :  async (Bool){
-    if (not Utils.isManager(caller)) {
-      throw Error.reject("@deleteContentCanister: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
-    };
+    // if (not Utils.isManager(caller)) {
+    //   throw Error.reject("@deleteContentCanister: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
+    // };
 
     for(canister in B.vals(contentCanisterIds)){
       if(canister == canisterId){

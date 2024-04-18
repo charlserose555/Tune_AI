@@ -15,7 +15,7 @@ module Types {
     
     public type Timestamp = Int;
     
-    public type ContentId = Text; // chosen by createVideo
+    public type ContentId = Text;
     public type VideoId = Text; // chosen by createVideo
     public type ChunkId = Text; // VideoId # (toText(ChunkNum))
     
@@ -41,24 +41,38 @@ module Types {
 
     public type ContentInit = {
       userId : UserId;
-      name: Text;
-      createdAt : Timestamp;
-      description: Text;
-      tags: [Text];
+      userCanisterId : Principal;
+      title: Text;
+      createdAt : Timestamp;      
       chunkCount: Nat;
-      extension: FileExtension;
+      fileType: Text;
       size: Nat;
-      contentId: Text;
-      // thumbnail: ?Thumbnail;
-      // trailer: ?Trailer;
+      duration: Nat;
+      thumbnail: Thumbnail;
+    };
+
+
+    public type ContentData = {
+      userId : UserId;
+      contentId : Text;
+      userCanisterId: Principal;
+      contentCanisterId: Principal;
+      createdAt : Timestamp;
+      uploadedAt : Timestamp;
+      playCount : Nat;
+      title: Text;
+      duration: Nat;
+      size: Nat;
+      chunkCount: Nat;
+      fileType: Text;
+      thumbnail: Thumbnail;
     };
 
     public type Thumbnail = {
-      name: Text;
-      extension: FileExtension;
-      size: Nat;
-      file: ?Blob;
+      fileType: Text;
+      file: Blob;
     };
+    
     public type Trailer = {
       name: Text;
       chunkCount: Nat;
@@ -66,20 +80,6 @@ module Types {
       size: Nat;
       file: ?Blob;
     };
-
-    public type ContentData = {
-      contentId : Text;
-      userId : UserId;
-      createdAt : Timestamp;
-      uploadedAt : Timestamp;
-      description: Text;
-      tags: [Text];
-      name: Text;
-      chunkCount: Nat;
-      extension: FileExtension;
-      size: Nat;
-    };
-
 
     public type FanAccountData = {
         userPrincipal: Principal;
@@ -96,8 +96,10 @@ module Types {
         displayName: Text;
         userName: Text;
         userPrincipal: Principal;
-        profilePhoto: ?ProfilePhoto;
+        avatar: ?ProfilePhoto;
+        fileType: ?Text;
         createdAt: Timestamp;
+        updatedAt: Timestamp;
     };
 
     public type PrincipalInfo = {

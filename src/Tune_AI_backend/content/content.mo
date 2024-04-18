@@ -55,58 +55,59 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
   private let canisterUtils : CanisterUtils.CanisterUtils = CanisterUtils.CanisterUtils();
   private let walletUtils : WalletUtils.WalletUtils = WalletUtils.WalletUtils();
 
-  stable let content = Map.new<ContentId, ContentData>(thash);
+  stable let content = Map.new<Text, ContentData>(thash);
   stable let chunksData = Map.new<ChunkId, ChunkData>(thash);
 
 
 
 // #region - CREATE & UPLOAD CONTENT
-  public shared({caller}) func createContent(i : ContentInit) : async ?ContentId {
+  public shared({caller}) func createContent(i : ContentInit, contentUUID : Nat) : async ?(ContentId, ContentData) {
     assert(caller == owner or Utils.isManager(caller) or caller == artistBucket);
     let now = Time.now();
     // let videoId = Principal.toText(i.userId) # "-" # i.name # "-" # (Int.toText(now));
-    switch (Map.get(content, thash, i.contentId)) {
+    switch (Map.get(content, thash, Nat.toText(contentUUID))) {
     case (?_) { throw Error.reject("Content ID already taken")};
     case null { 
-       let a = Map.put(content, thash, i.contentId,
-                        {
-                          contentId = i.contentId;
+      let contentData = {
                           userId = i.userId;
-                          name = i.name;
+                          contentId = Nat.toText(contentUUID);
+                          userCanisterId = i.userCanisterId;
+                          contentCanisterId = Principal.fromActor(this);
+                          title = i.title;
                           createdAt = i.createdAt;
+                          fileType = i.fileType;
+                          duration = i.duration;
                           uploadedAt = now;
-                          description =  i.description;
+                          playCount = 0;
                           chunkCount = i.chunkCount;
-                          tags = i.tags;
-                          extension = i.extension;
                           size = i.size;
-                        });
+                          thumbnail = i.thumbnail;
+                        };
+
+       let a = Map.put(content, thash, Nat.toText(contentUUID), contentData);
+
         // await checkCyclesBalance();
-       ?i.contentId
+       ?(Nat.toText(contentUUID), contentData)
      };
     }
   };
 
-
-
-  public shared({caller}) func putContentChunk(contentId : ContentId, chunkNum : Nat, chunkData : Blob) : async (){
+  public shared({caller}) func putContentChunk(contentId : ContentId, chunkNum : Nat, chunkData : Blob) : async Nat{
     assert(caller == owner or Utils.isManager(caller));
     let a = Map.put(chunksData, thash, chunkId(contentId, chunkNum), chunkData);
-  };
 
+    return chunkNum;
+  };
 
 
   public query({caller}) func getContentChunk(contentId : ContentId, chunkNum : Nat) : async ?Blob {
-    assert(caller == owner or Utils.isManager(caller));
+    // assert(caller == owner or Utils.isManager(caller));
     Map.get(chunksData, thash, chunkId(contentId, chunkNum));
   };
-
-
 
   private func chunkId(contentId : ContentId, chunkNum : Nat) : ChunkId {
     contentId # (Nat.toText(chunkNum))
   };
-
 
 
   public shared({caller}) func removeContent(contentId: ContentId, chunkNum : Nat) : async () {
@@ -114,8 +115,6 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
     let a = Map.remove(chunksData, thash, chunkId(contentId, chunkNum));
     let b = Map.remove(content, thash, contentId);
   };
-
-
 
   public query({caller}) func getContentInfo(id: ContentId) : async ?ContentData{
     // assert(caller == owner or Utils.isManager(caller));
