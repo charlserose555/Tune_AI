@@ -25,8 +25,9 @@ import Utils                "../utils/utils";
 import WalletUtils          "../utils/wallet.utils";
 import S                    "mo:base/ExperimentalStableMemory";
 import IC                   "../ic.types";
+import Option               "mo:base/Option";
 
-actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBucket: Principal) = this {
+actor class ArtistContentBucket(owner: Principal, manager: Principal, contentManager:Principal) = this {
 
   type UserId                    = T.UserId;
   type ContentInit               = T.ContentInit;
@@ -40,11 +41,18 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
   type Thumbnail                 = T.Thumbnail;
   type Trailer                   = T.Trailer;
   type CanisterStatus            = IC.canister_status_response;
-  
+  type HttpRequest               = T.HttpRequest;
+  type HttpResponse              = T.HttpResponse;
+  type StreamingCallbackToken    = T.StreamingCallbackToken;
+  type StreamingCallbackResponse = T.StreamingCallbackResponse;
+  type StreamingStrategy         = T.StreamingStrategy;
+
   let { ihash; nhash; thash; phash; calcHash } = Map;
 
   stable var canisterOwner: Principal = owner;
   stable var managerCanister: Principal = manager;
+  stable var contentManagerCanister: Principal = contentManager;
+
   stable var initialised: Bool = false;
   stable var MAX_CANISTER_SIZE: Nat =     68_700_000_000; // <-- approx. 64GB
   stable var CYCLE_AMOUNT : Nat     =  100_000_000_000; // minimum amount of cycles needed to create new canister 
@@ -62,7 +70,7 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
 
 // #region - CREATE & UPLOAD CONTENT
   public shared({caller}) func createContent(i : ContentInit, contentUUID : Nat) : async ?(ContentId, ContentData) {
-    assert(caller == owner or Utils.isManager(caller) or caller == artistBucket);
+    assert(caller == contentManager or Utils.isManager(caller));
     let now = Time.now();
     // let videoId = Principal.toText(i.userId) # "-" # i.name # "-" # (Int.toText(now));
     switch (Map.get(content, thash, Nat.toText(contentUUID))) {
@@ -111,14 +119,16 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
 
 
   public shared({caller}) func removeContent(contentId: ContentId, chunkNum : Nat) : async () {
-    assert(caller == owner or Utils.isManager(caller) or caller == artistBucket);
+    assert(caller == owner or Utils.isManager(caller));
     let a = Map.remove(chunksData, thash, chunkId(contentId, chunkNum));
     let b = Map.remove(content, thash, contentId);
   };
 
   public query({caller}) func getContentInfo(id: ContentId) : async ?ContentData{
     // assert(caller == owner or Utils.isManager(caller));
-    Map.get(content, thash, id);
+    let a = Map.get(content, thash, id);
+
+    return a;
   };
 
   public query({caller}) func getAllContentInfo(id: ContentId) : async [(ContentId, ContentData)]{
@@ -132,16 +142,148 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
     return Buffer.toArray(res);
     // Map.get(content, thash, id);
   };
+
+  public query func streamingCallback(token:StreamingCallbackToken): async StreamingCallbackResponse {
+    Debug.print("Sending chunk " # debug_show(token.key) # debug_show(token.index));
+    let body:Blob = switch(Map.get(chunksData, thash, chunkId(token.key, token.index))) {
+      case (?b) b;
+      case (null) "Not Found";
+    };
+    let next_token:?StreamingCallbackToken = switch(Map.get(chunksData, thash, chunkId(token.key, token.index+1))){
+      case (?nextbody) ?{
+        content_encoding=token.content_encoding;
+        key = token.key;
+        index = token.index+1;
+        sha256 = null;
+      };
+      case (null) null;
+    };
+
+    {
+      body=body;
+      token=next_token;
+    };
+  };
+
+  public query func http_request(req: HttpRequest) : async HttpResponse {
+      let fields:[Text]  = Iter.toArray<Text>(Text.split(req.url, #text("&contentId=")));
+      Debug.print("contentId " # debug_show(fields[1]));
+      let contentId:ContentId = fields[1];
+
+      let result:?(Text, Text) = Array.find<(Text, Text)>(req.headers, func((name, _)) { name == "range" });
+      Debug.print("result: " # debug_show(result));
+        switch(result) {
+          case (?(_, rangeHeader)) {
+            return handleRangeRequest(rangeHeader, contentId);
+          };
+          case (_) {
+            return {status_code = 206;
+                    headers = [
+                        ("Content-Range", "bytes " # Nat.toText(0) # "-" # Nat.toText(12) # "/" # Nat.toText(5)),
+                        ("Content-Type", "audio/mpeg"),
+                        ("Accept-Ranges", "bytes")
+                    ];
+                    body = Blob.fromArray([72, 101, 108, 108, 111]);}
+          }
+      };       
+  };
+
+  private func parseRangeHeader(range: Text): (Nat, Nat) {
+      // Parse the range header, expected format: "bytes=start-end"
+      let parts = Iter.toArray<Text>(Text.split(range, #text("=")))[1];
+      let rangeParts = Iter.toArray<Text>(Text.split(parts, #text("-")));
+      var start:?Nat = ?0;
+      var end:?Nat = ?0;
+      start:= Nat.fromText(rangeParts[0]);
+      end:= Nat.fromText(rangeParts[1]);
+
+      return (Option.get(start, 0), Option.get(end, (Option.get(start, 0) + 511_999)));
+  };
+
+  private func handleRangeRequest(rangeHeader: Text, contentId: ContentId) : HttpResponse {
+    var contentSize:Nat = 0;
+    var startValue:Nat = 0;
+    var endValue:Nat = 0;
+    var mainBlobArray: [Nat8] = [];
+
+    let _ = do? {        
+      let contentInfo:ContentData = Map.get(content, thash, contentId)!;
+      contentSize := contentInfo.size;
+      let (start, end) = parseRangeHeader(rangeHeader);
+
+      startValue := start;
+      endValue := Nat.min(end, contentSize - 1);      
+
+      Debug.print("start: " # debug_show(start));
+      Debug.print("end: " # debug_show(end));
+
+      var val:[Nat8] = [];
+      let startChunkIndex = start / 512_000; // 500KB per chunk
+      let endChunkIndex = end / 512_000;
+
+      let startOffset = start % 512_000;
+      let endOffset = end % 512_000 + 1;
+
+      var fullBlob:Blob = Blob.fromArray([]);
+      var fullBlobBuffer = Buffer.Buffer<[Nat8]>(endChunkIndex - startChunkIndex + 1);
+
+      Debug.print("startChunkIndex: " # debug_show(startChunkIndex));
+      Debug.print("endChunkIndex: " # debug_show(endChunkIndex));
+
+      var fullBlobArray:[Nat8] = [];
+
+      for (i in Iter.range(startChunkIndex, endChunkIndex)) {
+        Debug.print("rangeIndex: " # debug_show(i));
+
+        switch (Map.get(chunksData, thash, chunkId(contentId, i + 1))) {
+          case (?chunk) {
+            let chunkArray:[Nat8] = Blob.toArray(chunk);
+            fullBlobBuffer.add(chunkArray);
+
+            let size1 = fullBlobArray.size();
+            let size2 = chunkArray.size();
+
+            fullBlobArray :=  Prim.Array_tabulate<Nat8>(
+              size1 + size2,
+              func i {
+                if (i < size1) {
+                  fullBlobArray[i]
+                } else {
+                  chunkArray[i - size1]
+                }
+              }
+            );
+          };
+
+          case (null) {
+          };
+        };
+      };
+
+      Debug.print("full-content-Length: " # debug_show(Array.size(fullBlobArray)));
+
+      let length:Nat = endValue - startValue + 1;
+
+      Debug.print("Length: " # debug_show(length));
+      Debug.print("startOffset: " # debug_show(startOffset));
+
+      mainBlobArray := Array.subArray(fullBlobArray, startOffset, length);
+      Debug.print("Content-Length: " # debug_show(Array.size(mainBlobArray)));
+      Debug.print("Content-Size: " # debug_show(contentSize));
+    };
+
+    return {
+        status_code = 206;
+        headers = [
+            ("Content-Range", "bytes " # Nat.toText(startValue) # "-" # Nat.toText(endValue) # "/" # Nat.toText(contentSize)),
+            ("Content-Type", "audio/mpeg"),
+            ("Content-Length", Nat.toText(Array.size(mainBlobArray))),
+            ("Accept-Ranges", "bytes")
+        ];
+        body = Blob.fromArray(mainBlobArray);
+    };
+  };
 // #endregion
-
-
-
-  
-
-  
-
-
-
 
 // #region - UTILS
   public shared({caller}) func checkCyclesBalance () : async(){
@@ -205,12 +347,12 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, artistBuck
 
 
   public shared ({caller}) func transferFreezingThresholdCycles() : async () {
-    assert(Utils.isManager(caller) or caller == owner or caller == managerCanister or caller == artistBucket);
+    assert(Utils.isManager(caller) or caller == owner or caller == contentManagerCanister);
     // if (not Utils.isManager(caller)) {
     //   throw Error.reject("@transferFreezingThresholdCycles: Unauthorized access. Caller is not a manager. caller is: \n" # Principal.toText(caller));
     // };
 
-    await walletUtils.transferFreezingThresholdCycles(managerCanister);
+    await walletUtils.transferFreezingThresholdCycles(contentManagerCanister);
   };
 
 

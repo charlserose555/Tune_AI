@@ -120,4 +120,38 @@ module Types {
         heap_memory_size: ?Nat;
         version: ?Nat;
     }; 
+
+    public type StreamingCallbackToken = {
+    content_encoding : Text;
+    key : Text;
+    index : Nat; //starts at 1
+    sha256: ?[Nat8];
+  };
+
+  public type StreamingCallbackResponse = {
+    body : Blob;
+    token : ?StreamingCallbackToken;
+  };
+
+  public type StreamingCallback = query (StreamingCallbackToken) -> async (StreamingCallbackResponse);
+
+  public type StreamingStrategy = {
+    #Callback: {
+      token : StreamingCallbackToken;
+      callback : StreamingCallback;
+    }
+  };
+
+  public type HttpRequest = {
+    method: Text;
+    url: Text;
+    headers: [(Text, Text)];
+    body: Blob;
+  };
+  
+  public type HttpResponse = {
+    status_code: Nat16;
+    headers: [(Text, Text)];
+    body: Blob;
+  };
 }

@@ -59,6 +59,7 @@ actor Manager {
   stable let userToCanisterMap    = Map.new<Text, (Principal, Nat64)>(thash);
   stable let fanAccountsMap       = Map.new<UserId, CanisterId>(phash);
   stable let artistAccountsMap    = Map.new<UserId, CanisterId>(phash);
+  stable let artistData = Map.new<UserId, ArtistAccountData>(phash);
 
 
   public shared({caller}) func createAccountCanister(accountData: PrincipalInfo) : async (?Principal){
@@ -121,6 +122,28 @@ actor Manager {
     };
   };
 
+
+  // public func createProfileInfo(accountInfo: ?ArtistAccountData) : async (Bool) { // Initialise new cansiter. This is called only once after the account has been created. I
+  //   switch(accountInfo){
+  //     case(?info){
+  //       let a = Map.put(artistData, phash, info.userPrincipal, info);
+
+  //       let can = actor(info.accountCanisterId): actor { 
+  //           createProfileInfo: (ArtistAccountData) -> async ?(Bool);
+  //       };
+
+  //       switch(await can.createProfileInfo(info)) {
+  //         case (?result) {
+  //             return result;
+  //         }; 
+  //         case null {
+  //           return false;
+  //         }
+  //       }
+
+  //     };case null return false;
+  //   };
+  // };
 
   private func wallet_receive() : async { accepted: Nat64 } {
     let available = Cycles.available();
@@ -262,8 +285,6 @@ actor Manager {
   private func getCurrentCycles(): Nat {
     Cycles.balance();
   };
-
-
 
 
   public query func cyclesBalance() : async (Nat) {
