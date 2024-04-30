@@ -99,6 +99,31 @@ actor ContentManager {
         // Map.get(content, thash, id);
     };
 
+    public shared ({caller}) func increasePlayCount(contentId : ContentId) {
+        switch(Map.get(content, thash, contentId)){
+            case(?canInfo){
+                var updatedContentInfo: ContentData = {
+                    userId = canInfo.userId;
+                    contentId = canInfo.contentId;
+                    userCanisterId = canInfo.userCanisterId;
+                    contentCanisterId = canInfo.contentCanisterId;
+                    createdAt = canInfo.createdAt;
+                    uploadedAt = canInfo.uploadedAt;
+                    playCount = canInfo.playCount + 1;
+                    title = canInfo.title;
+                    duration = canInfo.duration;
+                    size = canInfo.size;
+                    chunkCount = canInfo.chunkCount;
+                    fileType = canInfo.fileType;
+                    thumbnail = canInfo.thumbnail;
+                };
+
+                let a = Map.replace(content, thash, contentId, updatedContentInfo);
+            };
+            case null { };
+        };
+    };
+
     public shared({caller}) func removeContent(contentId: ContentId, chunkNum : Nat) : async () {
         switch(Map.get(content, thash, contentId)){
             case(?canInfo){
