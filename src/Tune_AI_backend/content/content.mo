@@ -101,7 +101,7 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, contentMan
   };
 
   public shared({caller}) func putContentChunk(contentId : ContentId, chunkNum : Nat, chunkData : Blob) : async Nat{
-    assert(caller == owner or Utils.isManager(caller));
+      // assert(caller == owner or Utils.isManager(caller));
     let a = Map.put(chunksData, thash, chunkId(contentId, chunkNum), chunkData);
 
     return chunkNum;
