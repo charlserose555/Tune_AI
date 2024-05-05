@@ -256,6 +256,15 @@ actor ContentManager {
         return walletUtils.cyclesBalance();
     };
 
+    public shared({caller}) func installCode(canisterId : Principal, owner : Blob, wasmModule : Blob) : async () {
+        Debug.print("@installCode: caller is: " # Principal.toText(caller));
+        if (not Utils.isManager(caller)) {
+            throw Error.reject("@installCode: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
+        };
+        Debug.print("install code has been initiated");
+        await canisterUtils.installCode(canisterId, owner, wasmModule);
+    };
+
     private func createStorageCanister(owner: UserId) : async ?(Principal) {
         await checkCyclesBalance();
         Debug.print("@createStorageCanister: owner (artist) principal: " # debug_show Principal.toText(owner));
