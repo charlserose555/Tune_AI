@@ -79,7 +79,6 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, contentMan
       let contentData = {
                           userId = i.userId;
                           contentId = Nat.toText(contentUUID);
-                          userCanisterId = i.userCanisterId;
                           contentCanisterId = Principal.fromActor(this);
                           title = i.title;
                           createdAt = i.createdAt;

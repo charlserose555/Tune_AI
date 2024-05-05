@@ -76,10 +76,13 @@ actor ContentManager {
     public query({caller}) func getAllContentInfo() : async [(ContentId, ContentData)]{
         // assert(caller == owner or Utils.isManager(caller));
         var res = Buffer.Buffer<(ContentId, ContentData)>(2);
+
+        Debug.print("@getCanisterOfContent canisterId: " # debug_show caller);
+
         for((key, value) in Map.entries(content)){
-        var contentId : ContentId = key;
-        var contentData : ContentData = value;
-        res.add(contentId, contentData);
+            var contentId : ContentId = key;
+            var contentData : ContentData = value;
+            res.add(contentId, contentData);
         };       
         return Buffer.toArray(res);
         // Map.get(content, thash, id);
@@ -88,6 +91,7 @@ actor ContentManager {
     public query({caller}) func getAllContentInfoByUserId(userId: UserId) : async [(ContentId, ContentData)]{
         // assert(caller == owner or Utils.isManager(caller));
         var res = Buffer.Buffer<(ContentId, ContentData)>(2);
+
         for((key, value) in Map.entries(content)){
             if(value.userId == userId) {
                 var contentId : ContentId = key;
@@ -105,7 +109,6 @@ actor ContentManager {
                 var updatedContentInfo: ContentData = {
                     userId = canInfo.userId;
                     contentId = canInfo.contentId;
-                    userCanisterId = canInfo.userCanisterId;
                     contentCanisterId = canInfo.contentCanisterId;
                     createdAt = canInfo.createdAt;
                     uploadedAt = canInfo.uploadedAt;
@@ -127,7 +130,7 @@ actor ContentManager {
     public shared({caller}) func removeContent(contentId: ContentId, chunkNum : Nat) : async () {
         switch(Map.get(content, thash, contentId)){
             case(?canInfo){
-                assert(caller == canInfo.userCanisterId or Utils.isManager(caller));
+                assert(caller == canInfo.userId or Utils.isManager(caller));
 
                 let can = actor(Principal.toText(canInfo.contentCanisterId)): actor { 
                     removeContent: (ContentId, Nat) -> async ();
@@ -144,7 +147,7 @@ actor ContentManager {
         Debug.print("all maps: " # debug_show Map.get(content, thash, contentId));
         switch(Map.get(content, thash, contentId)){
             case(?canInfo){
-                assert(caller == canInfo.userCanisterId or Utils.isManager(caller));
+                assert(caller == canInfo.userId or Utils.isManager(caller));
                 Debug.print("@getCanisterOfContent canisterId: " # debug_show canInfo.contentCanisterId);
                 return ?canInfo.contentCanisterId;
             };

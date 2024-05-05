@@ -41,7 +41,6 @@ module Types {
 
     public type ContentInit = {
       userId : UserId;
-      userCanisterId : Principal;
       title: Text;
       createdAt : Timestamp;      
       chunkCount: Nat;
@@ -55,7 +54,6 @@ module Types {
     public type ContentData = {
       userId : UserId;
       contentId : Text;
-      userCanisterId: Principal;
       contentCanisterId: Principal;
       createdAt : Timestamp;
       uploadedAt : Timestamp;
