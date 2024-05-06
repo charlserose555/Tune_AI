@@ -21,6 +21,9 @@ import Array              "mo:base/Array";
 import Buffer             "mo:base/Buffer";
 import Trie               "mo:base/Trie";
 import TrieMap            "mo:base/TrieMap";
+import SHA256             "../sha/SHA256";
+import CRC32              "../sha/CRC32";
+import Hex                "../sha/Hex";
 import CanisterUtils      "../utils/canister.utils";
 import WalletUtils        "../utils/wallet.utils";
 import Utils              "../utils/utils";
@@ -210,12 +213,29 @@ actor ContentManager {
         B.toArray(contentCanisterIds);
     };
 
-    public query func getAvailableContentId() : async Nat {
+    public query func getAvailableContentId(userId : Text) : async Text {
+        var index: Nat = 1;
         let size = B.size(contentIds);
         if (size > 0) {
-            return size + 1;
+            index := size + 1;
         };
-        return 1;
+
+        let idHash = SHA256.Digest();
+        // Length of domain separator
+        idHash.write([0x0A]);
+        // Domain separator
+        idHash.write(Blob.toArray(Text.encodeUtf8(userId # Nat.toText(index) # Int.toText(Time.now()))));
+
+        let hashSum = idHash.sum();
+        let crc32Bytes = Utils.beBytes(CRC32.ofArray(hashSum));
+        let buf = Buffer.Buffer<Nat8>(32);
+        // let value = Blob.fromArray(Array.append(crc32Bytes, hashSum));
+
+        return Hex.encode(Array.append(crc32Bytes, hashSum));
+        // let buf = Buffer.Buffer<Nat8>(32);
+        // Blob.fromArray(Array.append(crc32Bytes, hashSum));
+
+        // return 1;
     };
 
     public shared({caller}) func createContent(i : ContentInit) : async ?(contentId : ContentId, contentCanisterId : Principal) {
@@ -224,7 +244,7 @@ actor ContentManager {
 
         var uploaded : Bool = false;
 
-        let contentUUID : Nat = await getAvailableContentId();
+        let contentUUID : Text = await getAvailableContentId(Principal.toText(caller));
 
         for(canister in B.vals(contentCanisterIds)){
             Debug.print("canister: " # debug_show canister);
@@ -234,7 +254,7 @@ actor ContentManager {
                 if(availableMemory > i.size){
 
                     let can = actor(Principal.toText(canister)): actor { 
-                        createContent: (ContentInit, Nat) -> async ?(ContentId, ContentData);
+                        createContent: (ContentInit, Text) -> async ?(ContentId, ContentData);
                     };
 
                     Debug.print("contentUUID: " # debug_show contentUUID);
@@ -265,7 +285,7 @@ actor ContentManager {
             case(?canID){
             B.add(contentCanisterIds, canID);
             let newCan = actor(Principal.toText(canID)): actor { 
-                createContent: (ContentInit, Nat) -> async ?(ContentId, ContentData);
+                createContent: (ContentInit, Text) -> async ?(ContentId, ContentData);
             };
             switch(await newCan.createContent(i, contentUUID)){
                 case(?(contentId, contentInfo)){ 

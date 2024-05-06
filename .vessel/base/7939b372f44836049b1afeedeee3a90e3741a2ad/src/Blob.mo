@@ -158,7 +158,7 @@ module {
   public func less(blob1 : Blob, blob2 : Blob) : Bool { blob1 < blob2 };
 
   /// "Less than or equal to" function for `Blob` types.
-  /// This is equivalent to `blob1 <= blob2`.
+  /// This is equivalent to `blob1 <= blob2`.getAvailableContentId
   ///
   /// Example:
   /// ```motoko include=import

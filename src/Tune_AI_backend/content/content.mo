@@ -69,35 +69,35 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, contentMan
 
 
 // #region - CREATE & UPLOAD CONTENT
-  public shared({caller}) func createContent(i : ContentInit, contentUUID : Nat) : async ?(ContentId, ContentData) {
+  public shared({caller}) func createContent(i : ContentInit, contentUUID : Text) : async ?(ContentId, ContentData) {
     assert(caller == contentManager or Utils.isManager(caller));
     let now = Time.now();
     // let videoId = Principal.toText(i.userId) # "-" # i.name # "-" # (Int.toText(now));
-    switch (Map.get(content, thash, Nat.toText(contentUUID))) {
-    case (?_) { throw Error.reject("Content ID already taken")};
-    case null { 
-      let contentData = {
-                          userId = i.userId;
-                          contentId = Nat.toText(contentUUID);
-                          contentCanisterId = Principal.fromActor(this);
-                          title = i.title;
-                          createdAt = i.createdAt;
-                          fileType = i.fileType;
-                          duration = i.duration;
-                          uploadedAt = now;
-                          playCount = 0;
-                          chunkCount = i.chunkCount;
-                          size = i.size;
-                          isReleased = i.isReleased; 
-                          thumbnail = i.thumbnail;
-                        };
+    switch (Map.get(content, thash, contentUUID)) {
+      case (?_) { throw Error.reject("Content ID already taken")};
+      case null { 
+        let contentData = {
+                            userId = i.userId;
+                            contentId = contentUUID;
+                            contentCanisterId = Principal.fromActor(this);
+                            title = i.title;
+                            createdAt = i.createdAt;
+                            fileType = i.fileType;
+                            duration = i.duration;
+                            uploadedAt = now;
+                            playCount = 0;
+                            chunkCount = i.chunkCount;
+                            size = i.size;
+                            isReleased = i.isReleased; 
+                            thumbnail = i.thumbnail;
+                          };
 
-       let a = Map.put(content, thash, Nat.toText(contentUUID), contentData);
+        let a = Map.put(content, thash, contentUUID, contentData);
 
-        // await checkCyclesBalance();
-       ?(Nat.toText(contentUUID), contentData)
-     };
-    }
+          // await checkCyclesBalance();
+        ?(contentUUID, contentData)
+      };
+      }
   };
 
   public shared({caller}) func putContentChunk(contentId : ContentId, chunkNum : Nat, chunkData : Blob) : async Nat{
