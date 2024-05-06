@@ -88,6 +88,7 @@ actor class ArtistContentBucket(owner: Principal, manager: Principal, contentMan
                           playCount = 0;
                           chunkCount = i.chunkCount;
                           size = i.size;
+                          isReleased = i.isReleased; 
                           thumbnail = i.thumbnail;
                         };
 

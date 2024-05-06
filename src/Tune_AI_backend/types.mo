@@ -6,6 +6,7 @@ import Text "mo:base/Text";
 import Iter "mo:base/Iter";
 import Float "mo:base/Float";
 import Result "mo:base/Result";
+import Bool "mo:base/Bool";
 import IC "./ic.types";
 
 module Types {
@@ -47,6 +48,7 @@ module Types {
       fileType: Text;
       size: Nat;
       duration: Nat;
+      isReleased: Bool;
       thumbnail: Thumbnail;
     };
 
@@ -63,6 +65,7 @@ module Types {
       size: Nat;
       chunkCount: Nat;
       fileType: Text;
+      isReleased: Bool;
       thumbnail: Thumbnail;
     };
 

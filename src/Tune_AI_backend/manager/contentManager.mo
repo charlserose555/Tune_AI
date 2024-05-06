@@ -66,6 +66,9 @@ actor ContentManager {
             case null { 
                 let a = Map.put(content, thash, contentInfo.contentId, contentInfo);
 
+                Debug.print("@getCanisterOfContent canisterId: " # debug_show contentInfo);
+
+
                 B.add(contentIds, contentInfo.contentId);
                     // await checkCyclesBalance();
                 ?contentInfo.contentId
@@ -73,16 +76,24 @@ actor ContentManager {
         }
     };
 
-    public query({caller}) func getAllContentInfo() : async [(ContentId, ContentData)]{
+    public query({caller}) func getAllContentInfo(isReleased: Bool) : async [(ContentId, ContentData)]{
         // assert(caller == owner or Utils.isManager(caller));
         var res = Buffer.Buffer<(ContentId, ContentData)>(2);
 
         Debug.print("@getCanisterOfContent canisterId: " # debug_show caller);
 
         for((key, value) in Map.entries(content)){
-            var contentId : ContentId = key;
-            var contentData : ContentData = value;
-            res.add(contentId, contentData);
+            if(isReleased) {
+                if(value.isReleased == isReleased) {
+                    var contentId : ContentId = key;
+                    var contentData : ContentData = value;
+                    res.add(contentId, contentData);
+                }
+            } else {
+                var contentId : ContentId = key;
+                var contentData : ContentData = value;
+                res.add(contentId, contentData);
+            }
         };       
         return Buffer.toArray(res);
         // Map.get(content, thash, id);
@@ -118,6 +129,32 @@ actor ContentManager {
                     size = canInfo.size;
                     chunkCount = canInfo.chunkCount;
                     fileType = canInfo.fileType;
+                    isReleased = canInfo.isReleased;
+                    thumbnail = canInfo.thumbnail;
+                };
+
+                let a = Map.replace(content, thash, contentId, updatedContentInfo);
+            };
+            case null { };
+        };
+    };
+
+    public shared ({caller}) func releaseTrack(contentId : ContentId, isReleased : Bool) {
+        switch(Map.get(content, thash, contentId)){
+            case(?canInfo){
+                var updatedContentInfo: ContentData = {
+                    userId = canInfo.userId;
+                    contentId = canInfo.contentId;
+                    contentCanisterId = canInfo.contentCanisterId;
+                    createdAt = canInfo.createdAt;
+                    uploadedAt = canInfo.uploadedAt;
+                    playCount = canInfo.playCount;
+                    title = canInfo.title;
+                    duration = canInfo.duration;
+                    size = canInfo.size;
+                    chunkCount = canInfo.chunkCount;
+                    fileType = canInfo.fileType;
+                    isReleased = isReleased;
                     thumbnail = canInfo.thumbnail;
                 };
 
@@ -211,8 +248,6 @@ actor ContentManager {
 
                             let c = await registerContentInfo(contentInfo);
                             
-                            Debug.print("contentInfo: " # debug_show contentInfo);
-
                             return ?(contentId, canister);
                         };
                         case null { 
@@ -359,6 +394,21 @@ actor ContentManager {
         };
         case null null;
         };
+    };
+
+    public shared({caller}) func deleteContentById(contentId: Text) :  async (Bool){
+        // if (not Utils.isManager(caller)) {
+        //   throw Error.reject("@deleteContentCanister: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
+        // };
+        switch (Map.get(content, thash, contentId)) {
+            case (?_) { 
+                Map.delete(content, thash, contentId);
+                return true; 
+            };
+            case null { 
+                return false;
+            };
+        }
     };
 
     public shared({caller}) func deleteContentCanister(canisterId: Principal) :  async (Bool){
