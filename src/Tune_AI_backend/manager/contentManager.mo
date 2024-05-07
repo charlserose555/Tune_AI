@@ -231,7 +231,7 @@ actor ContentManager {
         let buf = Buffer.Buffer<Nat8>(32);
         // let value = Blob.fromArray(Array.append(crc32Bytes, hashSum));
 
-        return Hex.encode(Array.append(crc32Bytes, hashSum));
+        return Hex.encode(hashSum);
         // let buf = Buffer.Buffer<Nat8>(32);
         // Blob.fromArray(Array.append(crc32Bytes, hashSum));
 

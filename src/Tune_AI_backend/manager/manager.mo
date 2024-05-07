@@ -328,7 +328,6 @@ actor Manager {
   };
 
 
-
   // public shared({caller}) func transferCyclesToContentCanister(accountCanisterId : Principal, contentCanisterId : Principal, amount : Nat) : async () { 
   //   // assert(caller == contentCanisterId or Utils.isManager(caller) or caller == accountCanisterId);
   //   for(value in Map.vals(artistAccountsMap)){
@@ -346,19 +345,18 @@ actor Manager {
   // };
 
 
-  // public shared({caller}) func deleteAccountCanister(user: UserId, canisterId: Principal) :  async (Bool){
-  //   // if (not Utils.isManager(caller)) {
-  //   //   throw Error.reject("@deleteAccountCanister: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
-  //   // };
-  //   switch(Map.get(artistAccountsMap, phash, user)){
-  //     case(?artistAccount){
-  //       Map.delete(artistAccountsMap, phash, user);
-  //       let res = await canisterUtils.deleteCanister(?canisterId);
-  //       return true;
-  //     };
-  //     case null false
-  //   }
-  // };
+  public shared({caller}) func deleteAccount(user: UserId) :  async (Bool){
+    // if (not Utils.isManager(caller)) {
+    //   throw Error.reject("@deleteAccountCanister: Unauthorized access. Caller is not the manager. Caller is: " # Principal.toText(caller));
+    // };
+    switch(Map.get(artistAccountData, phash, user)){
+      case(?artistAccount){
+        Map.delete(artistAccountData, phash, user);
+        return true;
+      };
+      case null false
+    }
+  };
 
   public shared({caller}) func installCode(canisterId : Principal, owner : Blob, wasmModule : Blob) : async () {
     Debug.print("@installCode: caller is: " # Principal.toText(caller));
